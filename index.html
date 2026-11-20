@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grade Target &amp; CGPA Calculator</title>
+
+  <!-- Google Fonts: Inter for UI and JetBrains Mono for tabular numbers -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+          },
+          colors: {
+            obsidian: '#0B0D10',
+            surface: '#14171D',
+            surfaceAlt: '#1A1F28',
+            inputBg: '#0E1116',
+            borderSubtle: '#232833',
+            borderHover: '#323949',
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* Strict flat dark theme base — zero gradients anywhere */
+    html, body {
+      background-color: #0B0D10;
+      color: #F3F4F6;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Remove default spin buttons on number inputs for cleaner UI */
+    input[type='number']::-webkit-inner-spin-button,
+    input[type='number']::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type='number'] {
+      -moz-appearance: textfield;
+    }
+
+    /* Custom Flat Range Slider (Touch-Friendly, Zero Gradients) */
+    input[type='range'].grade-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      background-color: #232833;
+      border-radius: 9999px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type='range'].grade-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 9999px;
+      background-color: #F3F4F6;
+      border: 3px solid #3B82F6;
+      cursor: pointer;
+      transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    input[type='range'].grade-slider::-webkit-slider-thumb:hover,
+    input[type='range'].grade-slider:focus::-webkit-slider-thumb {
+      transform: scale(1.1);
+      background-color: #FFFFFF;
+    }
+
+    input[type='range'].grade-slider::-moz-range-thumb {
+      width: 24px;
+      height: 24px;
+      border-radius: 9999px;
+      background-color: #F3F4F6;
+      border: 3px solid #3B82F6;
+      cursor: pointer;
+      transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    input[type='range'].grade-slider::-moz-range-track {
+      height: 8px;
+      background-color: #232833;
+      border-radius: 9999px;
+    }
+
+    /* Status-colored slider thumb variants (flat solid colors) */
+    input[type='range'].grade-slider.status-secured::-webkit-slider-thumb { border-color: #10B981; }
+    input[type='range'].grade-slider.status-doable::-webkit-slider-thumb { border-color: #38BDF8; }
+    input[type='range'].grade-slider.status-stretch::-webkit-slider-thumb { border-color: #F59E0B; }
+    input[type='range'].grade-slider.status-impossible::-webkit-slider-thumb { border-color: #EF4444; }
+
+    input[type='range'].grade-slider.status-secured::-moz-range-thumb { border-color: #10B981; }
+    input[type='range'].grade-slider.status-doable::-moz-range-thumb { border-color: #38BDF8; }
+    input[type='range'].grade-slider.status-stretch::-moz-range-thumb { border-color: #F59E0B; }
+    input[type='range'].grade-slider.status-impossible::-moz-range-thumb { border-color: #EF4444; }
+
+    /* Subtle card entrance animation */
+    @keyframes cardFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .card-animate {
+      animation: cardFadeIn 0.2s ease-out;
+    }
+  </style>
+</head>
+<body class="bg-obsidian text-[#F3F4F6] min-h-screen flex flex-col antialiased selection:bg-[#3B82F6] selection:text-white">
+
+  <!-- Sticky Top Summary Header -->
+  <header class="sticky top-0 z-30 bg-[#0B0D10]/95 backdrop-blur-sm border-b border-borderSubtle">
+    <div class="max-w-2xl mx-auto px-4 py-3.5">
+      <!-- Primary Row: Title + Live GPA Readout -->
+      <div class="flex items-center justify-between gap-3">
+        <!-- Left: App Title & Stats -->
+        <div class="min-w-0">
+          <h1 class="text-sm sm:text-base font-semibold tracking-tight text-[#F3F4F6] truncate">
+            Grade Target &amp; CGPA
+          </h1>
+          <div class="flex items-center gap-2 mt-1 text-xs text-[#9CA3AF]">
+            <span class="font-mono tabular-nums">
+              <strong id="header-subject-count" class="text-[#F3F4F6] font-medium">0</strong> subj
+            </span>
+            <span class="text-[#323949]">•</span>
+            <span class="font-mono tabular-nums">
+              <strong id="header-total-credits" class="text-[#F3F4F6] font-medium">0</strong> credits
+            </span>
+            <button
+              id="toggle-prev-cgpa-btn"
+              type="button"
+              class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface border border-borderSubtle text-[#9CA3AF] hover:text-[#F3F4F6] hover:border-borderHover transition-colors"
+              aria-expanded="false"
+              aria-controls="prev-cgpa-drawer"
+            >
+              <span>Prev CGPA</span>
+              <svg id="prev-cgpa-chevron" class="w-3 h-3 transition-transform duration-150" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Prominent Live SGPA / CGPA Readout -->
+        <div class="flex items-center gap-3 shrink-0">
+          <!-- Secondary SGPA badge (visible only when Prev CGPA is active) -->
+          <div id="sgpa-secondary-box" class="hidden text-right pr-3 border-r border-borderSubtle">
+            <div class="text-[10px] uppercase tracking-wider text-[#9CA3AF] font-medium">SGPA</div>
+            <div id="header-sgpa-secondary" class="font-mono tabular-nums text-base font-semibold text-[#D1D5DB]">0.00</div>
+          </div>
+
+          <!-- Main GPA Readout -->
+          <div class="text-right">
+            <div id="header-gpa-label" class="text-[10px] uppercase tracking-wider text-[#9CA3AF] font-medium">
+              Target SGPA
+            </div>
+            <div id="header-gpa-value" class="font-mono tabular-nums text-2xl sm:text-3xl font-bold leading-none mt-0.5 text-[#F3F4F6]">
+              0.00
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Impossible Grade Warning Banner (Hidden by default) -->
+      <div
+        id="impossible-warning-bar"
+        class="hidden mt-2.5 px-3 py-2 rounded-lg bg-[#2A1215] border border-[#7F1D1D] flex items-center justify-between gap-2 text-xs"
+      >
+        <div class="flex items-center gap-2 text-[#FCA5A5] min-w-0">
+          <svg class="w-4 h-4 shrink-0 text-[#EF4444]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+          </svg>
+          <span id="impossible-warning-text" class="truncate">1 subject has an unachievable target grade.</span>
+        </div>
+        <button
+          id="cap-all-btn"
+          type="button"
+          class="shrink-0 px-2.5 py-1 rounded-md bg-[#EF4444] hover:bg-[#DC2626] text-white font-medium text-[11px] transition-colors"
+        >
+          Cap to Max
+        </button>
+      </div>
+
+      <!-- Collapsible Previous CGPA Drawer -->
+      <div
+        id="prev-cgpa-drawer"
+        class="hidden mt-3 pt-3 border-t border-borderSubtle"
+      >
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="prev-cgpa-input" class="block text-[11px] font-medium text-[#9CA3AF] mb-1">
+              Previous CGPA (0–10)
+            </label>
+            <input
+              id="prev-cgpa-input"
+              type="number"
+              min="0"
+              max="10"
+              step="0.01"
+              placeholder="e.g. 8.25"
+              class="w-full px-3 py-2 rounded-lg bg-inputBg border border-borderSubtle focus:border-[#3B82F6] focus:outline-none font-mono tabular-nums text-sm text-[#F3F4F6] placeholder-[#4B5563]"
+            />
+          </div>
+          <div>
+            <label for="prev-credits-input" class="block text-[11px] font-medium text-[#9CA3AF] mb-1">
+              Completed Credits
+            </label>
+            <input
+              id="prev-credits-input"
+              type="number"
+              min="0"
+              max="300"
+              step="1"
+              placeholder="e.g. 64"
+              class="w-full px-3 py-2 rounded-lg bg-inputBg border border-borderSubtle focus:border-[#3B82F6] focus:outline-none font-mono tabular-nums text-sm text-[#F3F4F6] placeholder-[#4B5563]"
+            />
+          </div>
+        </div>
+        <div class="flex items-center justify-between mt-2 text-[11px] text-[#6B7280]">
+          <span>Enter both fields to calculate Cumulative CGPA.</span>
+          <button
+            id="clear-prev-cgpa-btn"
+            type="button"
+            class="text-[#9CA3AF] hover:text-[#F3F4F6] underline underline-offset-2 transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content: Subjects List -->
+  <main class="flex-1 w-full max-w-2xl mx-auto px-4 py-5">
+    <!-- Section Header & Actions -->
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
+        Subjects
+      </h2>
+      <div class="flex items-center gap-2">
+        <button
+          id="reset-btn"
+          type="button"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-borderSubtle text-[#9CA3AF] hover:text-[#F3F4F6] hover:border-borderHover transition-colors"
+        >
+          Reset
+        </button>
+        <button
+          id="add-subject-top-btn"
+          type="button"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#3B82F6] hover:bg-[#2563EB] text-white transition-colors"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+          </svg>
+          <span>Add Subject</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Subject Cards Container -->
+    <div id="subjects-container" class="space-y-4">
+      <!-- Cards injected dynamically by JS -->
+    </div>
+
+    <!-- Empty State (Shown if all subjects are deleted) -->
+    <div
+      id="empty-state"
+      class="hidden py-12 px-4 text-center rounded-xl bg-surface border border-dashed border-borderSubtle"
+    >
+      <p class="text-sm text-[#9CA3AF] mb-3">No subjects added yet.</p>
+      <button
+        id="empty-add-btn"
+        type="button"
+        class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[#3B82F6] hover:bg-[#2563EB] text-white transition-colors"
+      >
+        + Add Your First Subject
+      </button>
+    </div>
+
+    <!-- Bottom Add Subject Button (Convenient for mobile scrolling) -->
+    <button
+      id="add-subject-bottom-btn"
+      type="button"
+      class="mt-4 w-full py-3 rounded-xl bg-surface hover:bg-surfaceAlt border border-dashed border-borderHover text-sm font-medium text-[#D1D5DB] hover:text-white flex items-center justify-center gap-2 transition-colors"
+    >
+      <svg class="w-4 h-4 text-[#3B82F6]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+      </svg>
+      <span>Add Another Subject</span>
+    </button>
+  </main>
+
+  <!-- Compact Formula Footer -->
+  <footer class="w-full max-w-2xl mx-auto px-4 pt-2 pb-8 text-[11px] text-[#6B7280] leading-relaxed">
+    <div class="pt-4 border-t border-borderSubtle flex flex-col gap-1.5">
+      <p>
+        <strong class="text-[#9CA3AF] font-medium">Scoring Formula:</strong>
+        <span class="font-mono text-[#9CA3AF]">Total (100) = Internals (60) + End-Sem (75 × 40/75)</span>.
+        Required raw marks are rounded up to the nearest whole mark.
+      </p>
+      <p class="font-mono text-[10px] text-[#6B7280]">
+        Scale: C (50+, 5pt) • B (56+, 6pt) • B+ (61+, 7pt) • A (71+, 8pt) • A+ (81+, 9pt) • O (91+, 10pt)
+      </p>
+    </div>
+  </footer>
+
+  <!-- Flat Custom Reset Confirmation Modal (No browser confirm/alert) -->
+  <div
+    id="reset-modal"
+    class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="reset-modal-title"
+  >
+    <div class="w-full max-w-sm rounded-xl bg-surface border border-borderSubtle p-5">
+      <h3 id="reset-modal-title" class="text-base font-semibold text-[#F3F4F6]">
+        Reset Calculator?
+      </h3>
+      <p class="mt-1.5 text-sm text-[#9CA3AF]">
+        This will restore the default sample subjects and clear your saved data.
+      </p>
+      <div class="mt-5 flex items-center justify-end gap-2.5">
+        <button
+          id="cancel-reset-btn"
+          type="button"
+          class="px-4 py-2 rounded-lg text-sm font-medium bg-surfaceAlt border border-borderSubtle text-[#D1D5DB] hover:text-white transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          id="confirm-reset-btn"
+          type="button"
+          class="px-4 py-2 rounded-lg text-sm font-semibold bg-[#EF4444] hover:bg-[#DC2626] text-white transition-colors"
+        >
+          Reset All
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Script -->
+  <script>
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. CONSTANTS & GRADING SCALE
+      // =========================================================================
+      const STORAGE_KEY = 'grade_target_cgpa_v1';
+
+      const GRADES = [
+        { index: 0, label: 'C',  points: 5,  minTotal: 50 },
+        { index: 1, label: 'B',  points: 6,  minTotal: 56 },
+        { index: 2, label: 'B+', points: 7,  minTotal: 61 },
+        { index: 3, label: 'A',  points: 8,  minTotal: 71 },
+        { index: 4, label: 'A+', points: 9,  minTotal: 81 },
+        { index: 5, label: 'O',  points: 10, minTotal: 91 },
+      ];
+
+      const MAX_INTERNALS = 60;
+      const MAX_ENDSEM_RAW = 75;
+      const MAX_ENDSEM_SCALED = 40;
+
+      // Default pre-loaded subjects so users immediately see the tool in action
+      function getDefaultState() {
+        return {
+          subjects: [
+            {
+              id: generateId(),
+              name: 'Subject 1',
+              internals: 28,
+              credits: 4,
+              gradeIndex: 2, // B+
+            },
+            {
+              id: generateId(),
+              name: 'Subject 2',
+              internals: 45,
+              credits: 3,
+              gradeIndex: 4, // A+
+            },
+          ],
+          prevCgpa: '',
+          prevCredits: '',
+        };
+      }
+
+      // =========================================================================
+      // 2. STATE MANAGEMENT & PERSISTENCE
+      // =========================================================================
+      let state = loadState();
+
+      function generateId() {
+        return 'sub_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+      }
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return getDefaultState();
+          const parsed = JSON.parse(raw);
+          if (!parsed || !Array.isArray(parsed.subjects)) {
+            return getDefaultState();
+          }
+          // Sanitize loaded subjects
+          const cleanSubjects = parsed.subjects.map((sub, i) => ({
+            id: typeof sub.id === 'string' ? sub.id : generateId(),
+            name: typeof sub.name === 'string' ? sub.name : `Subject ${i + 1}`,
+            internals: clampNumber(parseFloat(sub.internals), 0, MAX_INTERNALS, 0),
+            credits: clampNumber(parseInt(sub.credits, 10), 1, 10, 4),
+            gradeIndex: clampNumber(parseInt(sub.gradeIndex, 10), 0, GRADES.length - 1, 2),
+          }));
+          return {
+            subjects: cleanSubjects,
+            prevCgpa: parsed.prevCgpa !== undefined ? String(parsed.prevCgpa) : '',
+            prevCredits: parsed.prevCredits !== undefined ? String(parsed.prevCredits) : '',
+          };
+        } catch (err) {
+          console.error('Failed to load state from localStorage:', err);
+          return getDefaultState();
+        }
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (err) {
+          console.error('Failed to save state to localStorage:', err);
+        }
+      }
+
+      function clampNumber(val, min, max, fallback) {
+        if (Number.isNaN(val) || !Number.isFinite(val)) return fallback;
+        return Math.min(max, Math.max(min, val));
+      }
+
+      // =========================================================================
+      // 3. CALCULATION LOGIC
+      // =========================================================================
+
+      /**
+       * Computes required end-sem score and feasibility for a subject & grade.
+       */
+      function calculateTarget(internals, gradeIndex) {
+        const safeInternals = clampNumber(parseFloat(internals), 0, MAX_INTERNALS, 0);
+        const grade = GRADES[gradeIndex] || GRADES[0];
+
+        const neededScaledExact = grade.minTotal - safeInternals;
+        const neededScaled = Math.max(0, neededScaledExact);
+        // Convert scaled (/40) to raw (/75) and round up
+        const neededRaw = neededScaledExact <= 0
+          ? 0
+          : Math.ceil((neededScaledExact * MAX_ENDSEM_RAW) / MAX_ENDSEM_SCALED);
+
+        // Determine maximum achievable grade with 75/75 (40/40 scaled) in end-sem
+        const maxPossibleTotal = safeInternals + MAX_ENDSEM_SCALED;
+        let maxAchievableGrade = null;
+        for (let i = GRADES.length - 1; i >= 0; i--) {
+          if (maxPossibleTotal >= GRADES[i].minTotal) {
+            maxAchievableGrade = GRADES[i];
+            break;
+          }
+        }
+
+        // Determine status category
+        let status = 'doable';
+        let statusLabel = 'Doable';
+        if (neededScaledExact <= 0) {
+          status = 'secured';
+          statusLabel = 'Secured';
+        } else if (neededRaw > MAX_ENDSEM_RAW) {
+          status = 'impossible';
+          statusLabel = 'Impossible';
+        } else if (neededRaw >= 56) {
+          status = 'stretch';
+          statusLabel = 'Stretch';
+        }
+
+        return {
+          grade,
+          neededScaled,
+          neededRaw,
+          maxPossibleTotal,
+          maxAchievableGrade,
+          status,
+          statusLabel,
+          isImpossible: status === 'impossible',
+        };
+      }
+
+      /**
+       * Returns flat solid Tailwind classes for a given status.
+       */
+      function getStatusStyles(status) {
+        switch (status) {
+          case 'secured':
+            return {
+              pill: 'bg-[#064E3B] text-[#34D399] border-[#065F46]',
+              valueText: 'text-[#34D399]',
+              boxBorder: 'border-[#065F46]/60',
+            };
+          case 'doable':
+            return {
+              pill: 'bg-[#0C2A3B] text-[#38BDF8] border-[#075985]',
+              valueText: 'text-[#F3F4F6]',
+              boxBorder: 'border-borderSubtle',
+            };
+          case 'stretch':
+            return {
+              pill: 'bg-[#3B2606] text-[#FBBF24] border-[#92400E]',
+              valueText: 'text-[#FBBF24]',
+              boxBorder: 'border-[#92400E]/70',
+            };
+          case 'impossible':
+            return {
+              pill: 'bg-[#3B1216] text-[#F87171] border-[#991B1B]',
+              valueText: 'text-[#EF4444]',
+              boxBorder: 'border-[#991B1B]',
+            };
+          default:
+            return {
+              pill: 'bg-surfaceAlt text-[#9CA3AF] border-borderSubtle',
+              valueText: 'text-[#F3F4F6]',
+              boxBorder: 'border-borderSubtle',
+            };
+        }
+      }
+
+      // =========================================================================
+      // 4. DOM REFERENCES
+      // =========================================================================
+      const dom = {
+        subjectsContainer: document.getElementById('subjects-container'),
+        emptyState: document.getElementById('empty-state'),
+        headerSubjectCount: document.getElementById('header-subject-count'),
+        headerTotalCredits: document.getElementById('header-total-credits'),
+        headerGpaLabel: document.getElementById('header-gpa-label'),
+        headerGpaValue: document.getElementById('header-gpa-value'),
+        sgpaSecondaryBox: document.getElementById('sgpa-secondary-box'),
+        headerSgpaSecondary: document.getElementById('header-sgpa-secondary'),
+        impossibleWarningBar: document.getElementById('impossible-warning-bar'),
+        impossibleWarningText: document.getElementById('impossible-warning-text'),
+        capAllBtn: document.getElementById('cap-all-btn'),
+        togglePrevCgpaBtn: document.getElementById('toggle-prev-cgpa-btn'),
+        prevCgpaChevron: document.getElementById('prev-cgpa-chevron'),
+        prevCgpaDrawer: document.getElementById('prev-cgpa-drawer'),
+        prevCgpaInput: document.getElementById('prev-cgpa-input'),
+        prevCreditsInput: document.getElementById('prev-credits-input'),
+        clearPrevCgpaBtn: document.getElementById('clear-prev-cgpa-btn'),
+        addSubjectTopBtn: document.getElementById('add-subject-top-btn'),
+        addSubjectBottomBtn: document.getElementById('add-subject-bottom-btn'),
+        emptyAddBtn: document.getElementById('empty-add-btn'),
+        resetBtn: document.getElementById('reset-btn'),
+        resetModal: document.getElementById('reset-modal'),
+        cancelResetBtn: document.getElementById('cancel-reset-btn'),
+        confirmResetBtn: document.getElementById('confirm-reset-btn'),
+      };
+
+      // =========================================================================
+      // 5. RENDERING FUNCTIONS
+      // =========================================================================
+
+      /**
+       * Updates the sticky header SGPA / CGPA summary and warning bar.
+       */
+      function updateSummaryHeader() {
+        let totalCredits = 0;
+        let totalWeightedPoints = 0;
+        let impossibleCount = 0;
+
+        state.subjects.forEach((sub) => {
+          const calc = calculateTarget(sub.internals, sub.gradeIndex);
+          totalCredits += sub.credits;
+          totalWeightedPoints += sub.credits * calc.grade.points;
+          if (calc.isImpossible) impossibleCount++;
+        });
+
+        const sgpa = totalCredits > 0 ? totalWeightedPoints / totalCredits : 0;
+
+        dom.headerSubjectCount.textContent = String(state.subjects.length);
+        dom.headerTotalCredits.textContent = String(totalCredits);
+
+        // Check if Previous CGPA & Completed Credits are valid for Cumulative CGPA
+        const prevCgpaNum = parseFloat(state.prevCgpa);
+        const prevCreditsNum = parseFloat(state.prevCredits);
+        const hasPrevData =
+          !Number.isNaN(prevCgpaNum) &&
+          !Number.isNaN(prevCreditsNum) &&
+          prevCgpaNum >= 0 &&
+          prevCgpaNum <= 10 &&
+          prevCreditsNum > 0;
+
+        if (hasPrevData) {
+          const cumulativeCredits = prevCreditsNum + totalCredits;
+          const cumulativePoints = prevCgpaNum * prevCreditsNum + totalWeightedPoints;
+          const cgpa = cumulativeCredits > 0 ? cumulativePoints / cumulativeCredits : 0;
+
+          dom.headerGpaLabel.textContent = 'Target CGPA';
+          dom.headerGpaValue.textContent = cgpa.toFixed(2);
+          dom.headerSgpaSecondary.textContent = sgpa.toFixed(2);
+          dom.sgpaSecondaryBox.classList.remove('hidden');
+        } else {
+          dom.headerGpaLabel.textContent = 'Target SGPA';
+          dom.headerGpaValue.textContent = sgpa.toFixed(2);
+          dom.sgpaSecondaryBox.classList.add('hidden');
+        }
+
+        // Visual feedback if any selected target grade is impossible
+        if (impossibleCount > 0) {
+          dom.impossibleWarningBar.classList.remove('hidden');
+          dom.impossibleWarningText.textContent =
+            impossibleCount === 1
+              ? '1 subject has an unachievable target grade.'
+              : `${impossibleCount} subjects have unachievable target grades.`;
+          dom.headerGpaValue.classList.add('text-[#F87171]');
+          dom.headerGpaValue.classList.remove('text-[#F3F4F6]');
+        } else {
+          dom.impossibleWarningBar.classList.add('hidden');
+          dom.headerGpaValue.classList.remove('text-[#F87171]');
+          dom.headerGpaValue.classList.add('text-[#F3F4F6]');
+        }
+
+        // Toggle empty state visibility
+        if (state.subjects.length === 0) {
+          dom.emptyState.classList.remove('hidden');
+          dom.addSubjectBottomBtn.classList.add('hidden');
+        } else {
+          dom.emptyState.classList.add('hidden');
+          dom.addSubjectBottomBtn.classList.remove('hidden');
+        }
+      }
+
+      /**
+       * Updates only the dynamic calculation parts of a single card (avoids losing input focus).
+       */
+      function updateCardCalculations(cardEl, subject) {
+        const calc = calculateTarget(subject.internals, subject.gradeIndex);
+        const styles = getStatusStyles(calc.status);
+
+        // Update slider class for thumb color
+        const slider = cardEl.querySelector('.grade-slider');
+        if (slider) {
+          slider.value = String(subject.gradeIndex);
+          slider.classList.remove('status-secured', 'status-doable', 'status-stretch', 'status-impossible');
+          slider.classList.add(`status-${calc.status}`);
+        }
+
+        // Update selected grade badge next to slider title
+        const selectedGradeTag = cardEl.querySelector('.selected-grade-tag');
+        if (selectedGradeTag) {
+          selectedGradeTag.textContent = `${calc.grade.label} (${calc.grade.points} pts)`;
+        }
+
+        // Update clickable grade labels beneath the slider (achievable vs impossible indicators)
+        const gradeBtns = cardEl.querySelectorAll('.grade-tick-btn');
+        gradeBtns.forEach((btn) => {
+          const gIdx = parseInt(btn.dataset.gradeIndex, 10);
+          const gObj = GRADES[gIdx];
+          const isSelected = gIdx === subject.gradeIndex;
+          const isPossible = calc.maxPossibleTotal >= gObj.minTotal;
+
+          btn.className = 'grade-tick-btn flex flex-col items-center py-1.5 rounded-lg text-xs font-mono transition-colors select-none ';
+
+          if (isSelected) {
+            if (isPossible) {
+              btn.className += 'bg-[#1E293B] text-white font-bold border border-[#3B82F6]';
+            } else {
+              btn.className += 'bg-[#3B1216] text-[#FCA5A5] font-bold border border-[#EF4444]';
+            }
+          } else if (isPossible) {
+            btn.className += 'text-[#D1D5DB] hover:bg-surfaceAlt border border-transparent';
+          } else {
+            btn.className += 'text-[#4B5563] hover:bg-surfaceAlt/50 border border-transparent';
+          }
+
+          // Feasibility dot indicator
+          const dot = btn.querySelector('.grade-dot');
+          if (dot) {
+            dot.className = 'grade-dot w-1.5 h-1.5 rounded-full mt-1 ';
+            if (!isPossible) {
+              dot.className += 'bg-[#7F1D1D]';
+            } else if (subject.internals >= gObj.minTotal) {
+              dot.className += 'bg-[#10B981]';
+            } else {
+              dot.className += isSelected ? 'bg-[#3B82F6]' : 'bg-[#323949]';
+            }
+          }
+        });
+
+        // Update Target Output Box
+        const targetBox = cardEl.querySelector('.target-display-box');
+        if (targetBox) {
+          targetBox.className = `target-display-box mt-4 p-3.5 rounded-xl bg-inputBg border ${styles.boxBorder} flex items-center justify-between gap-3`;
+        }
+
+        const primaryScoreEl = cardEl.querySelector('.target-raw-score');
+        const subtextEl = cardEl.querySelector('.target-subtext');
+        const statusPillEl = cardEl.querySelector('.target-status-pill');
+        const snapMaxBtn = cardEl.querySelector('.snap-max-btn');
+
+        if (statusPillEl) {
+          statusPillEl.textContent = calc.statusLabel;
+          statusPillEl.className = `target-status-pill inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold border ${styles.pill}`;
+        }
+
+        if (calc.isImpossible) {
+          if (primaryScoreEl) {
+            primaryScoreEl.innerHTML = `<span class="${styles.valueText}">Not Possible</span>`;
+          }
+          if (subtextEl) {
+            if (calc.maxAchievableGrade) {
+              subtextEl.textContent = `Max achievable: ${calc.maxAchievableGrade.label} (Total max: ${calc.maxPossibleTotal.toFixed(1).replace(/\.0$/, '')}/100)`;
+            } else {
+              subtextEl.textContent = `Max possible total is ${calc.maxPossibleTotal.toFixed(1).replace(/\.0$/, '')}/100 (Need 50 to pass)`;
+            }
+          }
+          if (snapMaxBtn) {
+            if (calc.maxAchievableGrade) {
+              snapMaxBtn.classList.remove('hidden');
+              snapMaxBtn.textContent = `Set to ${calc.maxAchievableGrade.label}`;
+              snapMaxBtn.dataset.targetGradeIndex = String(calc.maxAchievableGrade.index);
+            } else {
+              snapMaxBtn.classList.add('hidden');
+            }
+          }
+        } else {
+          if (primaryScoreEl) {
+            primaryScoreEl.innerHTML = `<span class="${styles.valueText}">${calc.neededRaw}</span> <span class="text-sm font-normal text-[#6B7280]">/ 75</span>`;
+          }
+          if (subtextEl) {
+            const scaledFormatted = calc.neededScaled.toFixed(1);
+            subtextEl.textContent =
+              calc.status === 'secured'
+                ? `Already at ${subject.internals}/100 • 0.0 / 40 scaled needed`
+                : `${scaledFormatted} / 40 scaled needed for ${calc.grade.label} (${calc.grade.minTotal}+)`;
+          }
+          if (snapMaxBtn) {
+            snapMaxBtn.classList.add('hidden');
+          }
+        }
+
+        // Update credits display
+        const creditValEl = cardEl.querySelector('.credit-value-display');
+        if (creditValEl) {
+          creditValEl.textContent = String(subject.credits);
+        }
+      }
+
+      /**
+       * Creates a complete DOM card element for a subject.
+       */
+      function createSubjectCard(subject) {
+        const card = document.createElement('article');
+        card.className = 'subject-card card-animate rounded-xl bg-surface border border-borderSubtle p-4 sm:p-5';
+        card.dataset.id = subject.id;
+
+        // Build grade tick buttons HTML
+        const gradeTicksHtml = GRADES.map((g) => {
+          return `
+            <button
+              type="button"
+              class="grade-tick-btn"
+              data-grade-index="${g.index}"
+              title="Target ${g.label} (${g.minTotal}+ total, ${g.points} pts)"
+            >
+              <span>${g.label}</span>
+              <span class="grade-dot"></span>
+            </button>
+          `;
+        }).join('');
+
+        card.innerHTML = `
+          <!-- Card Header: Editable Subject Name & Delete Button -->
+          <div class="flex items-center justify-between gap-2 pb-3 border-b border-borderSubtle">
+            <input
+              type="text"
+              class="subject-name-input flex-1 min-w-0 bg-transparent text-base font-semibold text-[#F3F4F6] placeholder-[#4B5563] focus:outline-none focus:bg-inputBg px-2 py-1 -ml-2 rounded-md border border-transparent focus:border-borderHover transition-colors"
+              value="${escapeHtml(subject.name)}"
+              placeholder="Subject name (e.g. DSA)"
+              aria-label="Subject Name"
+            />
+            <button
+              type="button"
+              class="delete-subject-btn shrink-0 p-2 rounded-lg text-[#6B7280] hover:text-[#EF4444] hover:bg-[#2A1215] transition-colors"
+              title="Remove subject"
+              aria-label="Remove subject"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Inputs Row: Internal Marks (/60) & Credits Stepper -->
+          <div class="grid grid-cols-2 gap-3 mt-3.5">
+            <!-- Internal Marks Input -->
+            <div>
+              <label class="block text-[11px] font-medium text-[#9CA3AF] mb-1.5">
+                Internal Marks
+              </label>
+              <div class="relative flex items-center">
+                <input
+                  type="number"
+                  min="0"
+                  max="60"
+                  step="0.5"
+                  inputmode="decimal"
+                  class="internals-input w-full pl-3 pr-12 py-2.5 rounded-lg bg-inputBg border border-borderSubtle focus:border-[#3B82F6] focus:outline-none font-mono tabular-nums text-base font-semibold text-[#F3F4F6]"
+                  value="${subject.internals}"
+                  aria-label="Internal Marks out of 60"
+                />
+                <span class="absolute right-3 font-mono text-xs text-[#6B7280] pointer-events-none">
+                  / 60
+                </span>
+              </div>
+            </div>
+
+            <!-- Credits Stepper -->
+            <div>
+              <label class="block text-[11px] font-medium text-[#9CA3AF] mb-1.5">
+                Credits
+              </label>
+              <div class="flex items-center rounded-lg bg-inputBg border border-borderSubtle overflow-hidden h-[46px]">
+                <button
+                  type="button"
+                  class="credit-dec-btn w-11 h-full flex items-center justify-center text-[#9CA3AF] hover:text-white hover:bg-surfaceAlt transition-colors text-lg font-medium"
+                  aria-label="Decrease credits"
+                >
+                  −
+                </button>
+                <div class="credit-value-display flex-1 text-center font-mono tabular-nums text-base font-semibold text-[#F3F4F6] select-none">
+                  ${subject.credits}
+                </div>
+                <button
+                  type="button"
+                  class="credit-inc-btn w-11 h-full flex items-center justify-center text-[#9CA3AF] hover:text-white hover:bg-surfaceAlt transition-colors text-lg font-medium"
+                  aria-label="Increase credits"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Target Grade Slider Section -->
+          <div class="mt-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[11px] font-medium text-[#9CA3AF]">Target Grade</span>
+              <span class="selected-grade-tag font-mono text-xs font-semibold text-[#F3F4F6]"></span>
+            </div>
+
+            <div class="px-1">
+              <input
+                type="range"
+                min="0"
+                max="5"
+                step="1"
+                value="${subject.gradeIndex}"
+                class="grade-slider"
+                aria-label="Select target grade"
+              />
+            </div>
+
+            <!-- Clickable Grade Labels -->
+            <div class="grid grid-cols-6 gap-1 mt-2">
+              ${gradeTicksHtml}
+            </div>
+          </div>
+
+          <!-- Live End-Sem Target Display Box -->
+          <div class="target-display-box">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[11px] uppercase tracking-wider font-medium text-[#9CA3AF]">
+                  End-Sem Needed
+                </span>
+                <span class="target-status-pill"></span>
+              </div>
+              <div class="target-raw-score font-mono tabular-nums text-2xl font-bold mt-1 leading-tight"></div>
+              <div class="target-subtext text-[11px] font-mono text-[#9CA3AF] mt-1"></div>
+            </div>
+            <button
+              type="button"
+              class="snap-max-btn hidden shrink-0 px-3 py-2 rounded-lg bg-surfaceAlt hover:bg-[#232833] border border-borderHover text-xs font-semibold text-[#F3F4F6] transition-colors"
+            >
+              Set Max
+            </button>
+          </div>
+        `;
+
+        // Attach Event Listeners for this card
+        attachCardEvents(card, subject.id);
+
+        // Initial calculation paint
+        updateCardCalculations(card, subject);
+
+        return card;
+      }
+
+      /**
+       * Renders the full list of subjects into the DOM.
+       */
+      function renderAllSubjects() {
+        dom.subjectsContainer.innerHTML = '';
+        state.subjects.forEach((subject) => {
+          dom.subjectsContainer.appendChild(createSubjectCard(subject));
+        });
+        updateSummaryHeader();
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      // =========================================================================
+      // 6. EVENT HANDLERS
+      // =========================================================================
+
+      function getSubjectById(id) {
+        return state.subjects.find((s) => s.id === id);
+      }
+
+      function attachCardEvents(cardEl, subjectId) {
+        const nameInput = cardEl.querySelector('.subject-name-input');
+        const deleteBtn = cardEl.querySelector('.delete-subject-btn');
+        const internalsInput = cardEl.querySelector('.internals-input');
+        const creditDecBtn = cardEl.querySelector('.credit-dec-btn');
+        const creditIncBtn = cardEl.querySelector('.credit-inc-btn');
+        const slider = cardEl.querySelector('.grade-slider');
+        const gradeBtns = cardEl.querySelectorAll('.grade-tick-btn');
+        const snapMaxBtn = cardEl.querySelector('.snap-max-btn');
+
+        // Subject Name
+        nameInput.addEventListener('input', (e) => {
+          const sub = getSubjectById(subjectId);
+          if (!sub) return;
+          sub.name = e.target.value;
+          saveState();
+        });
+
+        // Delete Subject
+        deleteBtn.addEventListener('click', () => {
+          state.subjects = state.subjects.filter((s) => s.id !== subjectId);
+          saveState();
+          cardEl.remove();
+          updateSummaryHeader();
+        });
+
+        // Internal Marks (live update + clamping on blur)
+        internalsInput.addEventListener('input', (e) => {
+          const sub = getSubjectById(subjectId);
+          if (!sub) return;
+          const rawVal = e.target.value;
+          if (rawVal === '') {
+            sub.internals = 0;
+          } else {
+            let num = parseFloat(rawVal);
+            if (!Number.isNaN(num)) {
+              if (num > MAX_INTERNALS) {
+                num = MAX_INTERNALS;
+                e.target.value = String(MAX_INTERNALS);
+              } else if (num < 0) {
+                num = 0;
+                e.target.value = '0';
+              }
+              sub.internals = num;
+            }
+          }
+          saveState();
+          updateCardCalculations(cardEl, sub);
+          updateSummaryHeader();
+        });
+
+        internalsInput.addEventListener('blur', (e) => {
+          const sub = getSubjectById(subjectId);
+          if (!sub) return;
+          if (e.target.value === '') {
+            e.target.value = '0';
+          }
+          sub.internals = clampNumber(parseFloat(e.target.value), 0, MAX_INTERNALS, 0);
+          e.target.value = String(sub.internals);
+          saveState();
+          updateCardCalculations(cardEl, sub);
+          updateSummaryHeader();
+        });
+
+        // Credits Stepper (-)
+        creditDecBtn.addEventListener('click', () => {
+          const sub = getSubjectById(subjectId);
+          if (!sub || sub.credits <= 1) return;
+          sub.credits -= 1;
+          saveState();
+          updateCardCalculations(cardEl, sub);
+          updateSummaryHeader();
+        });
+
+        // Credits Stepper (+)
+        creditIncBtn.addEventListener('click', () => {
+          const sub = getSubjectById(subjectId);
+          if (!sub || sub.credits >= 10) return;
+          sub.credits += 1;
+          saveState();
+          updateCardCalculations(cardEl, sub);
+          updateSummaryHeader();
+        });
+
+        // Grade Slider
+        slider.addEventListener('input', (e) => {
+          const sub = getSubjectById(subjectId);
+          if (!sub) return;
+          sub.gradeIndex = clampNumber(parseInt(e.target.value, 10), 0, GRADES.length - 1, 0);
+          saveState();
+          updateCardCalculations(cardEl, sub);
+          updateSummaryHeader();
+        });
+
+        // Clickable Grade Labels
+        gradeBtns.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const sub = getSubjectById(subjectId);
+            if (!sub) return;
+            sub.gradeIndex = parseInt(btn.dataset.gradeIndex, 10);
+            saveState();
+            updateCardCalculations(cardEl, sub);
+            updateSummaryHeader();
+          });
+        });
+
+        // Snap to Max Achievable Grade Button
+        snapMaxBtn.addEventListener('click', () => {
+          const sub = getSubjectById(subjectId);
+          if (!sub) return;
+          const targetIdx = parseInt(snapMaxBtn.dataset.targetGradeIndex, 10);
+          if (!Number.isNaN(targetIdx)) {
+            sub.gradeIndex = targetIdx;
+            saveState();
+            updateCardCalculations(cardEl, sub);
+            updateSummaryHeader();
+          }
+        });
+      }
+
+      /**
+       * Adds a new subject card and scrolls it into view.
+       */
+      function addNewSubject() {
+        const nextNum = state.subjects.length + 1;
+        const newSubject = {
+          id: generateId(),
+          name: `Subject ${nextNum}`,
+          internals: 40,
+          credits: 4,
+          gradeIndex: 3, // A
+        };
+        state.subjects.push(newSubject);
+        saveState();
+
+        const cardEl = createSubjectCard(newSubject);
+        dom.subjectsContainer.appendChild(cardEl);
+        updateSummaryHeader();
+
+        // Smooth scroll to the newly added card
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      /**
+       * Caps all impossible subject grades to their highest achievable grade.
+       */
+      function capAllImpossibleGrades() {
+        state.subjects.forEach((sub) => {
+          const calc = calculateTarget(sub.internals, sub.gradeIndex);
+          if (calc.isImpossible && calc.maxAchievableGrade) {
+            sub.gradeIndex = calc.maxAchievableGrade.index;
+            const cardEl = dom.subjectsContainer.querySelector(`[data-id="${sub.id}"]`);
+            if (cardEl) {
+              updateCardCalculations(cardEl, sub);
+            }
+          }
+        });
+        saveState();
+        updateSummaryHeader();
+      }
+
+      // Global UI Event Listeners
+      dom.addSubjectTopBtn.addEventListener('click', addNewSubject);
+      dom.addSubjectBottomBtn.addEventListener('click', addNewSubject);
+      dom.emptyAddBtn.addEventListener('click', addNewSubject);
+      dom.capAllBtn.addEventListener('click', capAllImpossibleGrades);
+
+      // Previous CGPA Drawer Toggle
+      dom.togglePrevCgpaBtn.addEventListener('click', () => {
+        const isHidden = dom.prevCgpaDrawer.classList.toggle('hidden');
+        dom.togglePrevCgpaBtn.setAttribute('aria-expanded', String(!isHidden));
+        dom.prevCgpaChevron.classList.toggle('rotate-180', !isHidden);
+      });
+
+      // Previous CGPA Inputs
+      dom.prevCgpaInput.value = state.prevCgpa;
+      dom.prevCreditsInput.value = state.prevCredits;
+
+      dom.prevCgpaInput.addEventListener('input', (e) => {
+        let val = e.target.value;
+        if (val !== '') {
+          const num = parseFloat(val);
+          if (!Number.isNaN(num) && num > 10) {
+            val = '10';
+            e.target.value = val;
+          } else if (!Number.isNaN(num) && num < 0) {
+            val = '0';
+            e.target.value = val;
+          }
+        }
+        state.prevCgpa = val;
+        saveState();
+        updateSummaryHeader();
+      });
+
+      dom.prevCreditsInput.addEventListener('input', (e) => {
+        let val = e.target.value;
+        if (val !== '') {
+          const num = parseFloat(val);
+          if (!Number.isNaN(num) && num < 0) {
+            val = '0';
+            e.target.value = val;
+          }
+        }
+        state.prevCredits = val;
+        saveState();
+        updateSummaryHeader();
+      });
+
+      dom.clearPrevCgpaBtn.addEventListener('click', () => {
+        state.prevCgpa = '';
+        state.prevCredits = '';
+        dom.prevCgpaInput.value = '';
+        dom.prevCreditsInput.value = '';
+        saveState();
+        updateSummaryHeader();
+      });
+
+      // Reset Confirmation Modal
+      dom.resetBtn.addEventListener('click', () => {
+        dom.resetModal.classList.remove('hidden');
+      });
+
+      dom.cancelResetBtn.addEventListener('click', () => {
+        dom.resetModal.classList.add('hidden');
+      });
+
+      dom.resetModal.addEventListener('click', (e) => {
+        if (e.target === dom.resetModal) {
+          dom.resetModal.classList.add('hidden');
+        }
+      });
+
+      dom.confirmResetBtn.addEventListener('click', () => {
+        state = getDefaultState();
+        dom.prevCgpaInput.value = '';
+        dom.prevCreditsInput.value = '';
+        saveState();
+        renderAllSubjects();
+        dom.resetModal.classList.add('hidden');
+      });
+
+      // =========================================================================
+      // 7. INITIALIZE APP
+      // =========================================================================
+      renderAllSubjects();
+    })();
+  </script>
+</body>
+</html>
